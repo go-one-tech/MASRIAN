@@ -1,6 +1,15 @@
 
 export type Golongan = 'II/a' | 'II/b' | 'II/c' | 'II/d' | 'III/a' | 'III/b' | 'III/c' | 'III/d' | 'IV/a' | 'IV/b' | 'IV/c' | 'IV/d';
 
+export interface User {
+  id: string;
+  fullName: string;
+  username: string;
+  password?: string;
+  jabatan: string;
+  golongan: Golongan;
+}
+
 export interface Activity {
   id: string;
   name: string;

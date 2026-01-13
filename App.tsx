@@ -1,8 +1,8 @@
 
-import React, { useState, useRef, useMemo } from 'react';
+import React, { useState, useRef, useMemo, useEffect } from 'react';
 import { GeminiService } from './services/geminiService';
 import { marked } from 'marked';
-import { Golongan } from './types';
+import { Golongan, User } from './types';
 import { 
   ClipboardDocumentIcon, 
   ArrowPathIcon, 
@@ -18,7 +18,10 @@ import {
   SparklesIcon,
   UserIcon,
   IdentificationIcon,
-  Squares2X2Icon
+  Squares2X2Icon,
+  LockClosedIcon,
+  ArrowRightOnRectangleIcon,
+  UserCircleIcon
 } from '@heroicons/react/24/outline';
 
 const GOLONGAN_OPTIONS: Golongan[] = [
@@ -28,16 +31,95 @@ const GOLONGAN_OPTIONS: Golongan[] = [
 ];
 
 const App: React.FC = () => {
+  // Auth States
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [isRegistering, setIsRegistering] = useState(false);
+  const [authLoading, setAuthLoading] = useState(false);
+  
+  // Login Form States
+  const [loginUsername, setLoginUsername] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
+  
+  // Register Form States
+  const [regFullName, setRegFullName] = useState('');
+  const [regJabatan, setRegJabatan] = useState('');
+  const [regGolongan, setRegGolongan] = useState<Golongan>('II/a');
+  const [regUsername, setRegUsername] = useState('');
+  const [regPassword, setRegPassword] = useState('');
+
+  // App States
   const [loading, setLoading] = useState(false);
   const [report, setReport] = useState<string>('');
   const [topic, setTopic] = useState<string>('');
-  const [jabatan, setJabatan] = useState<string>('Pengendali Ekosistem Hutan');
-  const [golongan, setGolongan] = useState<Golongan>('II/a');
   const [includeFullPackage, setIncludeFullPackage] = useState<boolean>(true);
   const [copied, setCopied] = useState(false);
   const [file, setFile] = useState<File | null>(null);
   const [fileBase64, setFileBase64] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Check Session
+  useEffect(() => {
+    const savedUser = localStorage.getItem('masrian_session');
+    if (savedUser) {
+      setCurrentUser(JSON.parse(savedUser));
+    }
+  }, []);
+
+  const handleRegister = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!regFullName || !regUsername || !regPassword) return alert("Lengkapi data!");
+    
+    setAuthLoading(true);
+    const users: User[] = JSON.parse(localStorage.getItem('masrian_users') || '[]');
+    
+    if (users.find(u => u.username === regUsername)) {
+      setAuthLoading(false);
+      return alert("Username sudah terdaftar!");
+    }
+
+    const newUser: User = {
+      id: Date.now().toString(),
+      fullName: regFullName,
+      username: regUsername,
+      password: regPassword,
+      jabatan: regJabatan,
+      golongan: regGolongan
+    };
+
+    localStorage.setItem('masrian_users', JSON.stringify([...users, newUser]));
+    setTimeout(() => {
+      setAuthLoading(false);
+      setIsRegistering(false);
+      alert("Pendaftaran berhasil! Silakan login.");
+    }, 1000);
+  };
+
+  const handleLogin = (e: React.FormEvent) => {
+    e.preventDefault();
+    setAuthLoading(true);
+    
+    const users: User[] = JSON.parse(localStorage.getItem('masrian_users') || '[]');
+    const user = users.find(u => u.username === loginUsername && u.password === loginPassword);
+
+    setTimeout(() => {
+      if (user) {
+        const sessionUser = { ...user };
+        delete sessionUser.password;
+        setCurrentUser(sessionUser);
+        localStorage.setItem('masrian_session', JSON.stringify(sessionUser));
+      } else {
+        alert("Username atau password salah!");
+      }
+      setAuthLoading(false);
+    }, 800);
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('masrian_session');
+    setCurrentUser(null);
+    setReport('');
+    setTopic('');
+  };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
@@ -74,8 +156,9 @@ const App: React.FC = () => {
       const gemini = new GeminiService();
       
       let prompt = `TAHAP AWAL - IDENTIFIKASI PENGGUNA:
-      - Jabatan Fungsional: ${jabatan}
-      - Golongan/Pangkat: ${golongan}
+      - Jabatan Fungsional: ${currentUser?.jabatan}
+      - Golongan/Pangkat: ${currentUser?.golongan}
+      - Nama Pegawai: ${currentUser?.fullName}
       
       MASUKAN KEGIATAN: ${topic || 'Menganalisis dokumen PDF terlampir'}.
       
@@ -87,7 +170,7 @@ const App: React.FC = () => {
       Patuhi seluruh Logika Kepatutan Tugas, Level Kecakapan, dan Beban Kerja (8 Jam) sesuai profil di atas.`;
 
       if (file) {
-        prompt += `\n\nEkstrak detail dari PDF untuk memperkaya uraian tugas teknis yang pantas untuk ${jabatan} ${golongan}.`;
+        prompt += `\n\nEkstrak detail dari PDF untuk memperkaya uraian tugas teknis yang pantas untuk level ${currentUser?.golongan}.`;
       }
       
       const pdfData = fileBase64 ? { data: fileBase64, mimeType: 'application/pdf' } : undefined;
@@ -112,6 +195,126 @@ const App: React.FC = () => {
     return marked.parse(report);
   }, [report]);
 
+  // View: Login / Register
+  if (!currentUser) {
+    return (
+      <div className="min-h-screen flex flex-col bg-[#f0f4f8] items-center justify-center p-6">
+        <div className="flex flex-col items-center mb-10">
+          <div className="bg-emerald-600 p-4 rounded-[2rem] shadow-emerald-200 shadow-2xl transform rotate-3 mb-4">
+            <SparklesIcon className="w-10 h-10 text-white" />
+          </div>
+          <h1 className="heading-font text-4xl font-black tracking-tight uppercase text-slate-800">MASRIAN</h1>
+          <p className="text-sm font-bold text-emerald-700 italic">Master Laporan Harian</p>
+        </div>
+
+        <div className="w-full max-w-md bg-white rounded-[3rem] shadow-2xl shadow-slate-300/50 p-10 border border-white relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-50 rounded-full -mr-16 -mt-16 z-0 opacity-50"></div>
+          
+          <div className="relative z-10">
+            <h2 className="text-2xl font-black text-slate-800 mb-2">
+              {isRegistering ? 'Daftar Akun Baru' : 'Selamat Datang'}
+            </h2>
+            <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-8">
+              {isRegistering ? 'Silakan lengkapi data diri Anda' : 'Masuk untuk mengelola laporan'}
+            </p>
+
+            <form onSubmit={isRegistering ? handleRegister : handleLogin} className="space-y-4">
+              {isRegistering && (
+                <>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black text-slate-400 uppercase ml-2">Nama Lengkap</label>
+                    <input 
+                      type="text" 
+                      required
+                      value={regFullName}
+                      onChange={(e) => setRegFullName(e.target.value)}
+                      className="w-full px-5 py-3 rounded-2xl bg-slate-50 border border-slate-100 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 outline-none transition-all font-medium text-sm"
+                      placeholder="Masukkan nama sesuai SK"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-black text-slate-400 uppercase ml-2">Jabatan</label>
+                      <input 
+                        type="text" 
+                        required
+                        value={regJabatan}
+                        onChange={(e) => setRegJabatan(e.target.value)}
+                        className="w-full px-5 py-3 rounded-2xl bg-slate-50 border border-slate-100 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 outline-none transition-all font-medium text-sm"
+                        placeholder="Contoh: PEH"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-black text-slate-400 uppercase ml-2">Golongan</label>
+                      <select 
+                        value={regGolongan}
+                        onChange={(e) => setRegGolongan(e.target.value as Golongan)}
+                        className="w-full px-5 py-3 rounded-2xl bg-slate-50 border border-slate-100 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 outline-none transition-all font-bold text-sm appearance-none"
+                      >
+                        {GOLONGAN_OPTIONS.map(g => <option key={g} value={g}>{g}</option>)}
+                      </select>
+                    </div>
+                  </div>
+                </>
+              )}
+              
+              <div className="space-y-1">
+                <label className="text-[10px] font-black text-slate-400 uppercase ml-2">Username</label>
+                <div className="relative">
+                  <UserIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                  <input 
+                    type="text" 
+                    required
+                    value={isRegistering ? regUsername : loginUsername}
+                    onChange={(e) => isRegistering ? setRegUsername(e.target.value) : setLoginUsername(e.target.value)}
+                    className="w-full pl-11 pr-5 py-3 rounded-2xl bg-slate-50 border border-slate-100 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 outline-none transition-all font-medium text-sm"
+                    placeholder="Username"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[10px] font-black text-slate-400 uppercase ml-2">Password</label>
+                <div className="relative">
+                  <LockClosedIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                  <input 
+                    type="password" 
+                    required
+                    value={isRegistering ? regPassword : loginPassword}
+                    onChange={(e) => isRegistering ? setRegPassword(e.target.value) : setLoginPassword(e.target.value)}
+                    className="w-full pl-11 pr-5 py-3 rounded-2xl bg-slate-50 border border-slate-100 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 outline-none transition-all font-medium text-sm"
+                    placeholder="••••••••"
+                  />
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                disabled={authLoading}
+                className="w-full py-4 bg-gradient-to-r from-emerald-600 to-emerald-500 text-white rounded-full font-black text-sm uppercase tracking-widest shadow-lg shadow-emerald-200 hover:-translate-y-1 transition-all active:scale-95 disabled:opacity-50 mt-6"
+              >
+                {authLoading ? 'Memproses...' : (isRegistering ? 'Buat Akun' : 'Masuk Sekarang')}
+              </button>
+            </form>
+
+            <div className="mt-8 pt-8 border-t border-slate-50 text-center">
+              <p className="text-xs font-bold text-slate-400 uppercase tracking-tight">
+                {isRegistering ? 'Sudah punya akun?' : 'Belum punya akun?'}
+                <button 
+                  onClick={() => setIsRegistering(!isRegistering)}
+                  className="ml-2 text-emerald-600 hover:text-emerald-700 font-black underline decoration-2 underline-offset-4"
+                >
+                  {isRegistering ? 'Login di sini' : 'Daftar di sini'}
+                </button>
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // View: Main App (Protected)
   return (
     <div className="min-h-screen flex flex-col bg-[#f0f4f8]">
       {/* Header */}
@@ -127,11 +330,22 @@ const App: React.FC = () => {
               <p className="text-[9px] text-slate-400 uppercase tracking-[0.2em] font-black mt-1">#jangan sampai dipotong</p>
             </div>
           </div>
-          <div className="hidden md:flex items-center space-x-2">
-             <div className="flex flex-col items-end">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Sistem Inteligensi ASN</span>
-                <span className="text-sm font-bold text-slate-700 bg-emerald-50 px-4 py-1.5 rounded-full border border-emerald-100 text-emerald-700">Tahap Identifikasi Aktif</span>
-             </div>
+
+          <div className="flex items-center space-x-6">
+            <div className="hidden md:flex flex-col items-end pr-6 border-r border-slate-100">
+               <div className="flex items-center space-x-2">
+                 <span className="text-xs font-black text-slate-800 uppercase">{currentUser.fullName}</span>
+                 <UserCircleIcon className="w-6 h-6 text-emerald-600" />
+               </div>
+               <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{currentUser.jabatan} • {currentUser.golongan}</span>
+            </div>
+            <button 
+              onClick={handleLogout}
+              className="p-2.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-2xl transition-all active:scale-90"
+              title="Logout"
+            >
+              <ArrowRightOnRectangleIcon className="w-6 h-6" />
+            </button>
           </div>
         </div>
       </header>
@@ -144,41 +358,10 @@ const App: React.FC = () => {
               <div className="bg-emerald-100 p-2 rounded-xl">
                 <CpuChipIcon className="w-5 h-5 text-emerald-600" />
               </div>
-              <h2 className="heading-font text-xl font-extrabold text-slate-800 tracking-tight">Identitas Pegawai</h2>
+              <h2 className="heading-font text-xl font-extrabold text-slate-800 tracking-tight">Pusat Inteligensi</h2>
             </div>
             
             <div className="space-y-5">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 px-1">Golongan</label>
-                  <div className="relative group">
-                    <IdentificationIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-emerald-500 transition-colors" />
-                    <select 
-                      value={golongan}
-                      onChange={(e) => setGolongan(e.target.value as Golongan)}
-                      className="w-full pl-10 pr-4 py-3 text-sm font-bold bg-slate-50 border border-slate-100 rounded-2xl focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 outline-none transition-all appearance-none cursor-pointer"
-                    >
-                      {GOLONGAN_OPTIONS.map(opt => (
-                        <option key={opt} value={opt}>{opt}</option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 px-1">Jabatan</label>
-                  <div className="relative group">
-                    <UserIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-emerald-500 transition-colors" />
-                    <input 
-                      type="text"
-                      value={jabatan}
-                      onChange={(e) => setJabatan(e.target.value)}
-                      placeholder="Misal: PEH"
-                      className="w-full pl-10 pr-4 py-3 text-sm font-bold bg-slate-50 border border-slate-100 rounded-2xl focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 outline-none transition-all"
-                    />
-                  </div>
-                </div>
-              </div>
-
               <div>
                 <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 px-1">Konfigurasi Output</label>
                 <div className="flex bg-slate-100 p-1 rounded-2xl">
@@ -255,14 +438,14 @@ const App: React.FC = () => {
             <div className="space-y-3">
               <div className="bg-white/10 p-3 rounded-2xl backdrop-blur-md border border-white/10">
                 <p className="text-[10px] font-bold leading-relaxed text-indigo-50">
-                  <span className="text-white block font-black mb-0.5">Automated Mapping</span>
-                  Identifikasi kategori Jabatan & Golongan secara internal.
+                  <span className="text-white block font-black mb-0.5">Profile Bound</span>
+                  Laporan dikunci untuk {currentUser.jabatan} ({currentUser.golongan}).
                 </p>
               </div>
               <div className="bg-white/10 p-3 rounded-2xl backdrop-blur-md border border-white/10">
                 <p className="text-[10px] font-bold leading-relaxed text-indigo-50">
-                  <span className="text-white block font-black mb-0.5">Context Locking</span>
-                  Menjaga konsistensi narasi harian hingga bulanan.
+                  <span className="text-white block font-black mb-0.5">Workload Logic</span>
+                  Otomatis memecah tugas menjadi sub-kegiatan 8 jam.
                 </p>
               </div>
             </div>
@@ -312,9 +495,9 @@ const App: React.FC = () => {
                     <BriefcaseIcon className="w-20 h-20 opacity-20" />
                   </div>
                   <div className="text-center space-y-3">
-                    <p className="text-xs font-black uppercase tracking-[0.3em] text-slate-400">Menunggu Inisialisasi</p>
+                    <p className="text-xs font-black uppercase tracking-[0.3em] text-slate-400">Siap Menyusun</p>
                     <p className="text-[11px] font-medium text-slate-400/80 max-w-sm px-6 leading-relaxed">
-                      Sistem MASRIAN akan mengidentifikasi profil Anda dan menyusun laporan terpadu yang aman secara administratif.
+                      Laporan akan disesuaikan secara otomatis dengan profil {currentUser.fullName}.
                     </p>
                   </div>
                 </div>
