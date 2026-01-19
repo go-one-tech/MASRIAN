@@ -21,7 +21,8 @@ import {
   Squares2X2Icon,
   LockClosedIcon,
   ArrowRightOnRectangleIcon,
-  UserCircleIcon
+  UserCircleIcon,
+  ClockIcon
 } from '@heroicons/react/24/outline';
 
 const GOLONGAN_OPTIONS: Golongan[] = [
@@ -160,17 +161,22 @@ const App: React.FC = () => {
       - Golongan/Pangkat: ${currentUser?.golongan}
       - Nama Pegawai: ${currentUser?.fullName}
       
-      MASUKAN KEGIATAN: ${topic || 'Menganalisis dokumen PDF terlampir'}.
+      INPUT KEGIATAN & WAKTU: ${topic || 'Berdasarkan dokumen PDF terlampir'}.
       
-      INSTRUKSI KHUSUS:
+      INSTRUKSI KHUSUS LOGIKA WAKTU:
+      - JIKA saya menyebutkan jam tertentu (misal: "Jam 08.00 saya membuat laporan"), GUNAKAN jam tersebut tepat sesuai instruksi saya.
+      - JIKA saya tidak menyebutkan jam, buatlah pembagian waktu yang logis dan realistis dimulai dari jam masuk kantor.
+      - Pastikan urutan waktu di tabel BERURUTAN (kronologis).
+      
+      INSTRUKSI OUTPUT:
       ${includeFullPackage 
         ? "Susun Paket Lengkap: Laporan Harian (Tabel), Rekap Mingguan, dan Rekap Bulanan." 
         : "Susun Laporan Harian saja dalam bentuk tabel."}
       
-      Patuhi seluruh Logika Kepatutan Tugas, Level Kecakapan, dan Beban Kerja (8 Jam) sesuai profil di atas.`;
+      Patuhi seluruh Logika Kepatutan Tugas, Level Kecakapan, dan Beban Kerja (Minimal 8 Jam) sesuai profil di atas.`;
 
       if (file) {
-        prompt += `\n\nEkstrak detail dari PDF untuk memperkaya uraian tugas teknis yang pantas untuk level ${currentUser?.golongan}.`;
+        prompt += `\n\nEkstrak detail teknis dari dokumen PDF terlampir untuk memperkaya uraian tugas.`;
       }
       
       const pdfData = fileBase64 ? { data: fileBase64, mimeType: 'application/pdf' } : undefined;
@@ -402,12 +408,18 @@ const App: React.FC = () => {
                     </button>
                   </div>
                 )}
-                <textarea 
-                  value={topic}
-                  onChange={(e) => setTopic(e.target.value)}
-                  placeholder="Ceritakan aktivitas hari ini..."
-                  className="w-full h-28 mt-4 px-5 py-4 text-sm font-medium border border-slate-100 bg-slate-50/50 rounded-[1.5rem] focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 focus:bg-white transition-all outline-none placeholder:text-slate-300 shadow-inner"
-                />
+                <div className="mt-4 relative group">
+                  <ClockIcon className="absolute right-4 top-4 w-5 h-5 text-slate-300 group-focus-within:text-emerald-500 transition-colors pointer-events-none" />
+                  <textarea 
+                    value={topic}
+                    onChange={(e) => setTopic(e.target.value)}
+                    placeholder="Contoh: Jam 08.00 rapat koordinasi, pukul 11.00 menelaah surat..."
+                    className="w-full h-32 px-5 py-4 pr-12 text-sm font-medium border border-slate-100 bg-slate-50/50 rounded-[1.5rem] focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 focus:bg-white transition-all outline-none placeholder:text-slate-300 shadow-inner"
+                  />
+                </div>
+                <p className="mt-2 text-[9px] font-bold text-slate-400 uppercase tracking-widest px-2 italic">
+                  Tip: Masukkan jam spesifik jika diperlukan, atau biarkan sistem menyusun jadwal otomatis.
+                </p>
               </div>
 
               <button
@@ -438,14 +450,14 @@ const App: React.FC = () => {
             <div className="space-y-3">
               <div className="bg-white/10 p-3 rounded-2xl backdrop-blur-md border border-white/10">
                 <p className="text-[10px] font-bold leading-relaxed text-indigo-50">
-                  <span className="text-white block font-black mb-0.5">Profile Bound</span>
-                  Laporan dikunci untuk {currentUser.jabatan} ({currentUser.golongan}).
+                  <span className="text-white block font-black mb-0.5">Chronological Logic</span>
+                  Menyusun waktu secara otomatis jika tidak ditentukan user.
                 </p>
               </div>
               <div className="bg-white/10 p-3 rounded-2xl backdrop-blur-md border border-white/10">
                 <p className="text-[10px] font-bold leading-relaxed text-indigo-50">
-                  <span className="text-white block font-black mb-0.5">Workload Logic</span>
-                  Otomatis memecah tugas menjadi sub-kegiatan 8 jam.
+                  <span className="text-white block font-black mb-0.5">Smart Filling</span>
+                  Melengkapi celah waktu agar mencapai 8 jam kerja efektif.
                 </p>
               </div>
             </div>
